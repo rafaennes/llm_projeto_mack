@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "transparencia-gov": {
+      "command": "/home/ennes/mestrado/llm_projeto/mcp_server/start_mcp_server.sh",
+      "args": [],
+      "env": {
+        "DB_SQL_URL": "sqlite:////home/ennes/mestrado/llm_projeto/local_deploy/data/db_transparencia.db"
+      }
+    }
+  }
+}

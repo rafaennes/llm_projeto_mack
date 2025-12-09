@@ -1,0 +1,32 @@
+# Core LLM and LangChain dependencies
+langchain==0.1.20
+langchain-community==0.0.38
+langchain-core==0.1.52
+
+# LLM Runtime
+llama-cpp-python>=0.2.0
+mcp>=1.0.0
+
+# Database drivers
+psycopg2-binary>=2.9.9
+pymongo>=4.6.1
+SQLAlchemy>=2.0.25
+
+# Data processing
+pandas>=2.1.4
+
+# Embeddings and Vector Search
+sentence-transformers>=2.3.1
+
+# Text processing
+langchain-text-splitters>=0.0.1
+
+# Web framework
+streamlit>=1.29.0
+
+# API calls (for sync_emendas.py)
+requests>=2.31.0
+
+# Required for LlamaCpp compilation
+cmake>=3.26.0
+tabulate==0.9.0

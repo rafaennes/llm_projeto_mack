@@ -1,0 +1,4 @@
+# Dependências para Busca Híbrida (BM25 + Reranker)
+rank-bm25==0.2.2
+sentence-transformers>=2.5.0
+torch>=2.0.0

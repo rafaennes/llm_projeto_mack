@@ -33,7 +33,7 @@ Sistema inteligente para consulta de **Emendas Parlamentares** usando arquitetur
 
 Este sistema permite consultas em **linguagem natural** sobre emendas parlamentares brasileiras, combinando:
 
-- **📊 Dados Quantitativos**: 87.912 registros de emendas (2020-2024) em SQLite
+- **📊 Dados Quantitativos**: 87.912 registros de emendas (2025) em SQLite
 - **📚 Base Teórica**: Legislação, conceitos e processos em documentos Markdown
 - **🤖 Agente LLM**: Qwen2.5 1.5B quantizado (GGUF) para análise e geração
 - **🔍 Recuperação Híbrida**: BM25 (keyword-based) + CrossEncoder (semantic reranking)
@@ -1071,34 +1071,10 @@ python3 test_hybrid_search.py
 - ✅ Integração de LLMs locais (llama.cpp)
 - ✅ Model Context Protocol (MCP)
 
-**Código Fonte**: https://github.com/[seu-usuario]/llm_projeto
+**Código Fonte**: https://github.com/rafaennes/llm_projeto
 
 **Licença**: MIT (código) + CC-BY-4.0 (documentação)
 
----
-
-## 📝 Changelog
-
-### v2.0.0 (2024-12-09) - Hybrid Retrieval System ⭐
-- ✨ Implementado two-stage retrieval (BM25 + CrossEncoder)
-- ✨ Módulo `retrieval/` com BM25Index, Reranker e HybridSearch
-- ✨ Respostas teóricas com resumo sintético + trechos de referência
-- 📈 Melhoria de 34% na qualidade de recuperação
-- 📊 Latência média de 150ms (vs 30ms keyword simples)
-- 📚 Documentação técnica completa no README
-
-### v1.5.0 (2024-12-08) - SQL Corrections
-- 🐛 Corrigido schema (6 → 28 campos)
-- 🐛 Corrigido campo `uf` (nome completo vs sigla)
-- ✨ Formatação automática de valores monetários
-- 📝 Documentação em CORRECOES_SQL.md
-
-### v1.0.0 (2024-12-01) - Initial Release
-- ✨ Arquitetura MCP (server + client)
-- ✨ Agente Qwen 2.5 1.5B local
-- ✨ 6 ferramentas MCP (SQL + busca simples)
-- 📊 87.912 registros de emendas parlamentares
-- 🖥️ Interface Streamlit
 
 ---
 

@@ -1,6 +1,5 @@
 # RELATÓRIO TÉCNICO: EMENDAS PARLAMENTARES NO BRASIL
-## Normativas, Regras de Execução e o Papel de Controle do Ministro Flávio Dino
-
+## Normativas, Regras de Execução 
 ---
 
 ## SUMÁRIO EXECUTIVO

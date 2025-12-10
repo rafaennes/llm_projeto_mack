@@ -77,112 +77,156 @@ with st.sidebar:
                 st.success("Modelo carregado!")
 
 
-async def run_sql_agent(user_message, llm, status_container):
-    """Agente Especialista em SQL"""
-    
-    # SCHEMA EXPLÍCITO (atualizado com campos reais)
-    db_schema = """
-CREATE TABLE emendas_parlamentares (
-    codigo_emenda TEXT,
-    ano_emenda INTEGER,
-    tipo_emenda TEXT,
-    codigo_autor TEXT,
-    nome_autor TEXT, -- Nome do Deputado/Senador
-    numero_emenda TEXT,
-    localidade_gasto TEXT,
-    codigo_municipio_ibge TEXT,
-    municipio TEXT, -- Nome da Cidade
-    codigo_uf_ibge INTEGER,
-    uf TEXT, -- Sigla/Nome do Estado (SP, SÃO PAULO, RJ, etc)
-    regiao TEXT, -- Região (Sudeste, Sul, etc)
-    codigo_funcao TEXT,
-    nome_funcao TEXT, -- Área (Saúde, Educação)
-    codigo_subfuncao TEXT,
-    nome_subfuncao TEXT,
-    codigo_programa TEXT,
-    nome_programa TEXT,
-    codigo_acao TEXT,
-    nome_acao TEXT, -- Descrição da ação
-    codigo_plano_orcamentario TEXT,
-    nome_plano_orcamentario TEXT,
-    valor_empenhado REAL, -- Valor empenhado
-    valor_liquidado REAL, -- Valor liquidado
-    valor_pago REAL, -- Valor efetivamente pago
-    valor_restos_pagar_inscritos REAL,
-    valor_restos_pagar_cancelados REAL,
-    valor_restos_pagar_pagos REAL
-);
-"""
-    # Prompt com Chain-of-Thought para evitar memorização de exemplos
-    system_prompt = f"""Você é um gerador de SQL SQLite. Analise a pergunta e gere o SQL apropriado.
+def parse_simple_query(user_message):
+    """
+    Parser baseado em regras para queries simples.
+    Retorna SQL se conseguir interpretar, None caso contrário.
+    """
+    msg_lower = user_message.lower()
 
-SCHEMA:
-{db_schema}
+    # Detecta entidade (GROUP BY)
+    group_by = None
+    if any(word in msg_lower for word in ["parlamentar", "autor", "deputado", "senador"]):
+        group_by = "nome_autor"
+    elif any(word in msg_lower for word in ["uf", "estado", "unidade federativa"]):
+        group_by = "uf"
+    elif any(word in msg_lower for word in ["município", "municipio", "cidade"]):
+        group_by = "municipio"
+    elif any(word in msg_lower for word in ["região", "regiao"]):
+        group_by = "regiao"
+    elif any(word in msg_lower for word in ["função", "funcao", "área", "area"]):
+        group_by = "nome_funcao"
+    else:
+        return None  # Não conseguiu detectar entidade
 
-PERGUNTA: "{user_message}"
+    # Detecta agregações (SELECT)
+    select_fields = [group_by]
+    order_by = None
 
-PASSO 1 - Identifique o que perguntar:
-- Parlamentares/Autores/Deputados → campo: nome_autor
-- Estados/UF → campo: uf (contém "SÃO PAULO", não "SP")
-- Municípios/Cidades → campo: municipio
-- Regiões → campo: regiao
-- Funções/Áreas → campo: nome_funcao
+    has_count = any(word in msg_lower for word in ["quantas", "quantidade", "número", "numero", "count"])
+    has_sum = any(word in msg_lower for word in ["quanto", "soma", "total", "valor"])
 
-PASSO 2 - Identifique a operação:
-- "quantos", "listar", "top" → COUNT(*)
-- "soma", "total de valores" → SUM(valor_pago) ou SUM(valor_empenhado)
-- "média" → AVG(valor_pago)
-- Sem agregação → SELECT direto
+    if has_count:
+        select_fields.append("COUNT(*) as quantidade")
+        if not has_sum:
+            order_by = "quantidade"
 
-PASSO 3 - Identifique filtros:
-- "para saúde", "na área de educação" → WHERE nome_funcao LIKE '%palavra%'
-- "na região sul" → WHERE regiao = 'Sul'
-- "no estado X" → WHERE uf = 'NOME COMPLETO'
-
-PASSO 4 - Monte o SQL:
-SELECT [campos]
-FROM emendas_parlamentares
-WHERE [filtros se houver]
-GROUP BY [campo se usar agregação]
-ORDER BY [resultado] DESC
-LIMIT [número mencionado ou 20]
-
-AGORA GERE O SQL:
-```sql"""
-    
-    status_container.status("🔍 Gerando Query SQL...", expanded=True)
-    
-    # 1. Gera SQL
-    try:
-        # Stop token forçado para evitar alucinações
-        response_text = llm.invoke(system_prompt, stop=["User:", "```\n"])
-        
-        # Estratégia 1: Tenta pegar bloco Markdown fechado (Mais seguro)
-        import re
-        match = re.search(r"```sql\s*([\s\S]*?)\s*```", response_text, re.IGNORECASE)
-        
-        if match:
-            sql_response = match.group(1).strip()
+    if has_sum:
+        # Detecta qual valor (pago, empenhado, liquidado)
+        if "empenhado" in msg_lower:
+            select_fields.append("SUM(valor_empenhado) as total")
+        elif "liquidado" in msg_lower:
+            select_fields.append("SUM(valor_liquidado) as total")
         else:
-            # Estratégia 2: Fallback - Pega do primeiro SELECT até o primeiro ponto e vírgula
-            match_fallback = re.search(r"(SELECT\s+[\s\S]+?;)", response_text, re.IGNORECASE)
-            if match_fallback:
-                sql_response = match_fallback.group(1).strip()
+            select_fields.append("SUM(valor_pago) as total")
+        order_by = "total"
+
+    # Se não tem agregação, não é query simples
+    if len(select_fields) == 1:
+        return None
+
+    # Detecta filtros (WHERE)
+    where_clauses = []
+
+    # Filtro por função
+    if "saúde" in msg_lower or "saude" in msg_lower:
+        where_clauses.append("nome_funcao LIKE '%Saúde%'")
+    elif "educação" in msg_lower or "educacao" in msg_lower:
+        where_clauses.append("nome_funcao LIKE '%Educação%'")
+
+    # Filtro por região
+    if "sul" in msg_lower:
+        where_clauses.append("regiao = 'Sul'")
+    elif "sudeste" in msg_lower:
+        where_clauses.append("regiao = 'Sudeste'")
+    elif "nordeste" in msg_lower:
+        where_clauses.append("regiao = 'Nordeste'")
+    elif "norte" in msg_lower and "nordeste" not in msg_lower:
+        where_clauses.append("regiao = 'Norte'")
+    elif "centro-oeste" in msg_lower or "centro oeste" in msg_lower:
+        where_clauses.append("regiao = 'Centro-Oeste'")
+
+    # Detecta LIMIT
+    import re
+    limit_match = re.search(r'\b(\d+)\b', msg_lower)
+    limit = limit_match.group(1) if limit_match else "50"
+
+    # Monta SQL
+    sql = f"SELECT {', '.join(select_fields)}\n"
+    sql += f"FROM emendas_parlamentares"
+
+    if where_clauses:
+        sql += f"\nWHERE {' AND '.join(where_clauses)}"
+
+    sql += f"\nGROUP BY {group_by}"
+
+    if order_by:
+        sql += f"\nORDER BY {order_by} DESC"
+
+    sql += f"\nLIMIT {limit};"
+
+    return sql
+
+async def run_sql_agent(user_message, llm, status_container):
+    """Agente Especialista em SQL com parser híbrido (regras + LLM)"""
+
+    # TENTATIVA 1: Parser baseado em regras para queries simples
+    status_container.status("🔍 Analisando pergunta...", expanded=True)
+    simple_sql = parse_simple_query(user_message)
+
+    if simple_sql:
+        status_container.success("✅ Query interpretada por regras (rápido)")
+        sql_response = simple_sql
+    else:
+        status_container.info("🤖 Query complexa - usando LLM")
+
+        # SCHEMA PARA LLM
+        db_schema = """emendas_parlamentares (nome_autor, uf, municipio, regiao, nome_funcao, valor_pago, valor_empenhado)"""
+
+        # Prompt few-shot
+        system_prompt = f"""Gere SQL SQLite para: "{user_message}"
+
+Tabela: {db_schema}
+
+Exemplos:
+P: "top 20 parlamentares" → SELECT nome_autor, COUNT(*) as total FROM emendas_parlamentares GROUP BY nome_autor ORDER BY total DESC LIMIT 20;
+P: "soma por estado" → SELECT uf, SUM(valor_pago) as total FROM emendas_parlamentares GROUP BY uf ORDER BY total DESC LIMIT 50;
+
+SQL:
+```sql"""
+
+        status_container.status("🤖 Gerando SQL com LLM...", expanded=True)
+
+        # Gera SQL com LLM
+        try:
+            response_text = llm.invoke(system_prompt, stop=["User:", "```\n"], max_tokens=150)
+
+            # Estratégia 1: Tenta pegar bloco Markdown fechado
+            import re
+            match = re.search(r"```sql\s*([\s\S]*?)\s*```", response_text, re.IGNORECASE)
+
+            if match:
+                sql_response = match.group(1).strip()
             else:
-                 # Estratégia 3: Fallback final - tenta pegar linha única se não tiver ;
-                 match_line = re.search(r"(SELECT\s+.*)", response_text, re.IGNORECASE)
-                 if match_line:
-                    sql_response = match_line.group(1).strip()
-                 else:
-                    sql_response = f"SELECT * FROM emendas_parlamentares WHERE uf LIKE '%{user_message[-2:].upper()}%' LIMIT 10"
-        
-        # Remove caracteres perigosos que sobram
-        sql_response = sql_response.replace("```", "").split(';')[0].strip()
-        
-        status_container.info(f"Query Gerada: {sql_response}")
-        
-    except Exception as e:
-        return f"Erro ao gerar SQL: {e}", None
+                # Estratégia 2: Pega do primeiro SELECT até ;
+                match_fallback = re.search(r"(SELECT\s+[\s\S]+?;)", response_text, re.IGNORECASE)
+                if match_fallback:
+                    sql_response = match_fallback.group(1).strip()
+                else:
+                    # Estratégia 3: Pega linha única
+                    match_line = re.search(r"(SELECT\s+.*)", response_text, re.IGNORECASE)
+                    if match_line:
+                        sql_response = match_line.group(1).strip()
+                    else:
+                        return "❌ LLM não conseguiu gerar SQL válido. Tente reformular a pergunta.", None
+
+            # Remove caracteres extras
+            sql_response = sql_response.replace("```", "").split(';')[0].strip() + ";"
+
+            status_container.info(f"✅ SQL gerado pelo LLM")
+
+        except Exception as e:
+            return f"❌ Erro ao gerar SQL com LLM: {e}", None
 
     # 2. Executa
     status_container.status("🛠️ Executando no Banco...", expanded=True)

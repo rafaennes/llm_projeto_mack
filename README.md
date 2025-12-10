@@ -1054,12 +1054,12 @@ python3 test_hybrid_search.py
 
 ## 👨‍🎓 Informações Acadêmicas
 
-**Autor**: [Seu Nome]
-**Instituição**: [Universidade]
-**Programa**: Mestrado em [Área]
-**Disciplina**: Processamento de Linguagem Natural
-**Orientador**: Prof. Dr. [Nome]
-**Ano**: 2024/2025
+**Autor**: Rafael Silva Ennes
+**Instituição**: Universidade Presbiteriana Mackenzie
+**Programa**: Mestrado em Computação Aplicada
+**Disciplina**: Modelos de Linguagem e Generativos
+**Orientador**: Prof. Dr. Rogerio 
+**Ano**: 2025
 
 **Objetivos de Aprendizado Cobertos**:
 - ✅ Arquiteturas de sistemas RAG (Retrieval-Augmented Generation)

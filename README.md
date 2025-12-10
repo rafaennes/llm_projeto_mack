@@ -1,5 +1,4 @@
-# 🏛️ Sistema de Transparência Governamental com Busca Híbrida (BM25 + Reranker)
-
+# 🏛️ Sistema de Transparência Governamental - Emendas Parlamentares
 **Trabalho de Mestrado em Computação Aplicada, Mackenzie - Disciplina Modelos de Linguagens e Generativos**
 
 Sistema inteligente para consulta de **Emendas Parlamentares** usando arquitetura **MCP (Model Context Protocol)** da Anthropic, com agente LLM local (Qwen2.5 1.5B) e **sistema de recuperação híbrido BM25 + CrossEncoder** para perguntas teóricas.
